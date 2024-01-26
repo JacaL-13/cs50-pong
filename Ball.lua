@@ -10,9 +10,7 @@
     Represents a ball which will bounce back and forth between paddles
     and walls until it passes a left or right boundary of the screen,
     scoring a point for the opponent.
-]]
-
-Ball = Class{}
+]] Ball = Class {}
 
 function Ball:init(x, y, width, height)
     self.x = x
@@ -33,15 +31,24 @@ end
 function Ball:collides(paddle)
     -- first, check to see if the left edge of either is farther to the right
     -- than the right edge of the other
-    if self.x > paddle.x + paddle.width or paddle.x > self.x + self.width then
-        return false
+
+    if paddle == player1 then
+        if self.x > paddle.x + paddle.width then
+            return false
+        end
+
+    elseif paddle == player2 then
+        if self.x < paddle.x then
+            return false
+        end
+
     end
 
     -- then check to see if the bottom edge of either is higher than the top
     -- edge of the other
     if self.y > paddle.y + paddle.height or paddle.y > self.y + self.height then
         return false
-    end 
+    end
 
     -- if the above aren't true, they're overlapping
     return true
