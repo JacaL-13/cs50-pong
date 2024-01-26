@@ -46,11 +46,12 @@ VIRTUAL_WIDTH = 432
 VIRTUAL_HEIGHT = 243
 
 -- paddle movement speed
-PADDLE_SPEED = 200
+Human_PADDLE_SPEED = 200
+Computer_PADDLE_SPEED = 300
 
 -- declare player1 and player2 as human or computer
-isHumanP1 = false
-isHumanP2 = false
+p1State = 0
+p2State = 0
 
 ballPosition = 0
 ballPositionAccuracy = 0
@@ -84,12 +85,12 @@ function love.load()
     sounds = {
         ['score'] = love.audio.newSource('sounds/score.wav', 'static'),
         ['serve'] = love.audio.newSource('sounds/serve.wav', 'static'),
-		['bounce-23'] = love.audio.newSource('sounds/bounce-23.wav', 'static'),
-		['bounce-26'] = love.audio.newSource('sounds/bounce-26.wav', 'static'),
-		['bounce-27'] = love.audio.newSource('sounds/bounce-27.wav', 'static'),
-		['bounce-28'] = love.audio.newSource('sounds/bounce-28.wav', 'static'),
-		['bounce-29'] = love.audio.newSource('sounds/bounce-29.wav', 'static'),
-		['bounce-31'] = love.audio.newSource('sounds/bounce-31.wav', 'static'),
+        ['bounce-23'] = love.audio.newSource('sounds/bounce-23.wav', 'static'),
+        ['bounce-26'] = love.audio.newSource('sounds/bounce-26.wav', 'static'),
+        ['bounce-27'] = love.audio.newSource('sounds/bounce-27.wav', 'static'),
+        ['bounce-28'] = love.audio.newSource('sounds/bounce-28.wav', 'static'),
+        ['bounce-29'] = love.audio.newSource('sounds/bounce-29.wav', 'static'),
+        ['bounce-31'] = love.audio.newSource('sounds/bounce-31.wav', 'static')
     }
 
     song = {'27', '29', '23', '29', '27', '29', '23', '29', '28', '31', '23', '31', '28', '31', '23', '31', '27', '29',
@@ -110,8 +111,6 @@ function love.load()
 
     -- place a ball in the middle of the screen
     ball = Ball(VIRTUAL_WIDTH / 2 - 2, VIRTUAL_HEIGHT / 2 - 2, 4, 4)
-
-    ballPositionVarience = 10
 
     -- initialize score variables
     player1Score = 0
@@ -176,12 +175,12 @@ function love.update(dt)
                 ball.dy = math.random(10, 150)
             end
 
-            randomizeAiAccuracy()
+            randomizeAiAccuracy(10 - p2State)
 
-			playNote()
-			
-			songNote = songNote + 1
-			
+            playNote()
+
+            songNote = songNote + 1
+
         end
         if ball:collides(player2) then
             ball.dx = -ball.dx * 1.03
@@ -194,11 +193,11 @@ function love.update(dt)
                 ball.dy = math.random(10, 150)
             end
 
-            randomizeAiAccuracy()
+            randomizeAiAccuracy(10 - p1State)
 
-			playNote()
-			
-			songNote = songNote + 1
+            playNote()
+
+            songNote = songNote + 1
 
         end
 
@@ -208,9 +207,9 @@ function love.update(dt)
             ball.y = 0
             ball.dy = -ball.dy
 
-			playNote()
-			
-			songNote = songNote + 1
+            playNote()
+
+            songNote = songNote + 1
 
         end
 
@@ -219,15 +218,15 @@ function love.update(dt)
             ball.y = VIRTUAL_HEIGHT - 4
             ball.dy = -ball.dy
 
-			playNote()
-			
-			songNote = songNote + 1
-			
+            playNote()
+
+            songNote = songNote + 1
+
         end
 
         -- if we reach the left edge of the screen, go back to serve
         -- and update the score and serving player
-		
+
         if ball.x < 0 and not ball:collides(player1) then
             servingPlayer = 1
             player2Score = player2Score + 1
@@ -266,23 +265,22 @@ function love.update(dt)
         end
     end
 
-    --
-    -- paddles can move no matter what state we're in
-    --
-    -- player 1
-    if isHumanP1 then
-        direction = love.keyboard.isDown('w') and -1 or love.keyboard.isDown('s') and 1 or 0
-        humanPlayer(direction, player1)
-    else
-        computerPlayer(player1)
-    end
+    if gameState ~= 'start' then
+        -- player 1
+        if p1State == 0 then
+            direction = love.keyboard.isDown('w') and -1 or love.keyboard.isDown('s') and 1 or 0
+            humanPlayer(direction, player1)
+        else
+            computerPlayer(player1)
+        end
 
-    -- player 2
-    if isHumanP2 then
-        direction = love.keyboard.isDown('up') and -1 or love.keyboard.isDown('down') and 1 or 0
-        humanPlayer(direction, player2)
-    else
-        computerPlayer(player2)
+        -- player 2
+        if p2State == 0 then
+            direction = love.keyboard.isDown('up') and -1 or love.keyboard.isDown('down') and 1 or 0
+            humanPlayer(direction, player2)
+        else
+            computerPlayer(player2)
+        end
     end
 
     -- update our ball based on its DX and DY only if we're in play state;
@@ -296,39 +294,54 @@ function love.update(dt)
 end
 
 function playNote()
-	if songNote > #song then
-		songNote = 1
-	end
-	
-	note = song[songNote]
+    if songNote > #song then
+        songNote = 1
+    end
 
-	sounds['bounce-' .. note]:play()
+    note = song[songNote]
+
+    sounds['bounce-' .. note]:play()
 end
 
 function humanPlayer(direction, player)
-    player.dy = direction * PADDLE_SPEED
+    player.dy = direction * Human_PADDLE_SPEED
 end
 
 function computerPlayer(player)
 
-    ballPosition = ball.y + ballPositionAccuracy - 10
+    -- ball rise / run
+    trajectory = ball.dy / ball.dx
+
+    -- if trajectory is nan then trajectory = 0
+    if gameState ~= 'play' then
+        return
+    end
+
+    p1Intercept = ball.y - trajectory * ball.x
+
+    p2Intercept = trajectory * VIRTUAL_WIDTH + p1Intercept
+
+    intercept = player == player1 and p1Intercept or p2Intercept
+
+    ballPosition = intercept + ballPositionAccuracy - 10
 
     distance = math.abs(ballPosition - player.y)
 
-	incoming = player == player1 and ball.dx < 0 or player == player2 and ball.dx > 0
-	
+    incoming = player == player1 and ball.dx < 0 or player == player2 and ball.dx > 0
+
     if ballPosition > player.y and incoming then
-        player.dy = math.min(PADDLE_SPEED * distance / 10, PADDLE_SPEED)
+        player.dy = math.min(Computer_PADDLE_SPEED * distance / 10, Computer_PADDLE_SPEED)
     elseif ballPosition < player.y and incoming then
-        player.dy = math.max(-PADDLE_SPEED * distance / 10, -PADDLE_SPEED)
+        player.dy = math.max(-Computer_PADDLE_SPEED * distance / 10, -Computer_PADDLE_SPEED)
     else
         player.dy = 0
     end
 
 end
 
-function randomizeAiAccuracy()
-    accuracyVarience = 0
+function randomizeAiAccuracy(aiLevel)
+	print(aiLevel)
+    accuracyVarience = aiLevel * 2
     ballPositionAccuracy = math.random(-accuracyVarience, accuracyVarience)
 end
 
@@ -345,10 +358,11 @@ end
 function love.keypressed(key)
     -- `key` will be whatever key this callback detected as pressed
     if key == 'escape' then
-        -- the function LÖVE2D uses to quit the application
-        love.event.quit()
-        -- if we press enter during either the start or serve phase, it should
-        -- transition to the next appropriate state
+        
+        if gameState == 'serve' then
+			gameState = 'start'
+		end
+        
     elseif key == 'enter' or key == 'return' then
         if gameState == 'start' then
             gameState = 'serve'
@@ -356,9 +370,9 @@ function love.keypressed(key)
         elseif gameState == 'serve' then
             gameState = 'play'
 
-            randomizeAiAccuracy()
+            randomizeAiAccuracy(0)
 
-			songNote = 1
+            songNote = 1
 
             sounds['serve']:play()
         elseif gameState == 'done' then
@@ -380,6 +394,18 @@ function love.keypressed(key)
             end
         end
     end
+
+    if gameState == 'start' then
+        if key == 'w' and p1State < 10 then
+            p1State = p1State + 1
+        elseif key == 's' and p1State > 0 then
+            p1State = p1State - 1
+        elseif key == 'up' and p2State < 10 then
+            p2State = p2State + 1
+        elseif key == 'down' and p2State > 0 then
+            p2State = p2State - 1
+        end
+    end
 end
 
 --[[
@@ -398,6 +424,18 @@ function love.draw()
         love.graphics.setFont(smallFont)
         love.graphics.printf('Welcome to Pong!', 0, 10, VIRTUAL_WIDTH, 'center')
         love.graphics.printf('Press Enter to begin!', 0, 20, VIRTUAL_WIDTH, 'center')
+        love.graphics.printf('w / s to change:', 5, 10, VIRTUAL_WIDTH, 'left')
+        love.graphics.printf('up / down to change:', 0, 10, VIRTUAL_WIDTH - 5, 'right')
+        if p1State == 0 then
+            love.graphics.printf('Human', 5, 20, VIRTUAL_WIDTH, 'left')
+        else
+            love.graphics.printf('Computer lvl ' .. tostring(p1State), 5, 20, VIRTUAL_WIDTH, 'left')
+        end
+        if p2State == 0 then
+            love.graphics.printf('Human', 0, 20, VIRTUAL_WIDTH - 5, 'right')
+        else
+            love.graphics.printf('Computer lvl ' .. tostring(p2State), 0, 20, VIRTUAL_WIDTH - 5, 'right')
+        end
     elseif gameState == 'serve' then
         -- UI messages
         love.graphics.setFont(smallFont)
@@ -420,7 +458,7 @@ function love.draw()
     ball:render()
 
     -- display FPS for debugging; simply comment out to remove
-    displayFPS()
+    -- displayFPS()
 
     -- end our drawing to push
     push:apply('end')
